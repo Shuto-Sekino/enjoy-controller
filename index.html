@@ -385,18 +385,34 @@
 
         // Canvas サイズの調整
         function resizeCanvas() {
-            const maxWidth = window.innerWidth > 768 ? 800 : window.innerWidth - 40;
-            const maxHeight = window.innerWidth > 768 ? 600 : window.innerHeight - 300;
+            const isMobile = window.innerWidth <= 768;
 
-            canvas.width = Math.min(800, maxWidth);
-            canvas.height = Math.min(600, maxHeight);
+            if (isMobile) {
+                // モバイルの場合
+                const width = Math.min(window.innerWidth - 20, 600);
 
-            // スケールの調整
+                // 縦向きと横向きで高さを調整
+                const isLandscape = window.innerWidth > window.innerHeight;
+                const height = isLandscape
+                    ? Math.min(window.innerHeight - 100, 400)
+                    : Math.min(window.innerHeight - 250, 500);
+
+                canvas.width = width;
+                canvas.height = height;
+            } else {
+                // デスクトップの場合
+                canvas.width = 800;
+                canvas.height = 600;
+            }
+
+            // スケールの調整（振子が見えるように）
             scale = Math.min(canvas.width, canvas.height) / 8;
         }
 
         resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
 
         // メニュートグル
         const menuToggle = document.getElementById('menu-toggle');
@@ -493,8 +509,9 @@
             const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
 
             const dist = Math.sqrt((mouseX - pendulumX) ** 2 + (mouseY - pendulumY) ** 2);
+            const hitRadius = Math.max(30, scale * 0.5);
 
-            if (dist < 30) {
+            if (dist < hitRadius) {
                 isDragging = true;
                 dragStartY = mouseY;
                 dragStartTheta = state.theta;
@@ -533,8 +550,9 @@
             const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
 
             const dist = Math.sqrt((touchX - pendulumX) ** 2 + (touchY - pendulumY) ** 2);
+            const hitRadius = Math.max(40, scale * 0.6); // タッチ用に少し大きめ
 
-            if (dist < 40) { // タッチ用に少し大きめ
+            if (dist < hitRadius) {
                 isDragging = true;
                 dragStartY = touchY;
                 dragStartTheta = state.theta;
@@ -612,12 +630,19 @@
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
+            // スケールに応じたサイズ調整
+            const cartWidth = Math.max(40, scale * 0.8);
+            const cartHeight = Math.max(20, scale * 0.4);
+            const wheelRadius = Math.max(5, scale * 0.1);
+            const pendulumBallRadius = Math.max(8, scale * 0.15);
+
             // レール
             ctx.strokeStyle = '#ccc';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = Math.max(2, scale * 0.04);
             ctx.beginPath();
-            ctx.moveTo(50, centerY + 30);
-            ctx.lineTo(canvas.width - 50, centerY + 30);
+            const railMargin = Math.max(20, canvas.width * 0.05);
+            ctx.moveTo(railMargin, centerY + cartHeight / 2 + wheelRadius);
+            ctx.lineTo(canvas.width - railMargin, centerY + cartHeight / 2 + wheelRadius);
             ctx.stroke();
 
             // カート位置
@@ -626,18 +651,19 @@
 
             // カート
             ctx.fillStyle = '#3498db';
-            ctx.fillRect(cartX - 40, cartY - 20, 80, 40);
+            ctx.fillRect(cartX - cartWidth / 2, cartY - cartHeight / 2, cartWidth, cartHeight);
             ctx.strokeStyle = '#2980b9';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(cartX - 40, cartY - 20, 80, 40);
+            ctx.lineWidth = Math.max(2, scale * 0.03);
+            ctx.strokeRect(cartX - cartWidth / 2, cartY - cartHeight / 2, cartWidth, cartHeight);
 
             // 車輪
             ctx.fillStyle = '#34495e';
+            const wheelOffset = cartWidth / 3;
             ctx.beginPath();
-            ctx.arc(cartX - 25, cartY + 20, 10, 0, Math.PI * 2);
+            ctx.arc(cartX - wheelOffset, cartY + cartHeight / 2 + wheelRadius, wheelRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(cartX + 25, cartY + 20, 10, 0, Math.PI * 2);
+            ctx.arc(cartX + wheelOffset, cartY + cartHeight / 2 + wheelRadius, wheelRadius, 0, Math.PI * 2);
             ctx.fill();
 
             // 振子
@@ -646,7 +672,7 @@
 
             // 振子の棒
             ctx.strokeStyle = '#e74c3c';
-            ctx.lineWidth = 6;
+            ctx.lineWidth = Math.max(3, scale * 0.06);
             ctx.beginPath();
             ctx.moveTo(cartX, cartY);
             ctx.lineTo(pendulumX, pendulumY);
@@ -655,21 +681,21 @@
             // 振子の重り
             ctx.fillStyle = '#e74c3c';
             ctx.beginPath();
-            ctx.arc(pendulumX, pendulumY, 15, 0, Math.PI * 2);
+            ctx.arc(pendulumX, pendulumY, pendulumBallRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#c0392b';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = Math.max(2, scale * 0.03);
             ctx.stroke();
 
             // 支点
             ctx.fillStyle = '#2c3e50';
             ctx.beginPath();
-            ctx.arc(cartX, cartY, 8, 0, Math.PI * 2);
+            ctx.arc(cartX, cartY, Math.max(4, scale * 0.08), 0, Math.PI * 2);
             ctx.fill();
 
             // 目標角度の表示（垂直線）
             ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = Math.max(1, scale * 0.02);
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
             ctx.moveTo(cartX, cartY);
