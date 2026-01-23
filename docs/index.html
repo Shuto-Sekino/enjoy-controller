@@ -25,6 +25,8 @@
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
             overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 1000;
         }
 
         .main-content {
@@ -34,6 +36,26 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            position: relative;
+        }
+
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            font-size: 1.5em;
+        }
+
+        .menu-toggle:active {
+            transform: scale(0.95);
         }
 
         h1 {
@@ -185,10 +207,107 @@
             font-weight: bold;
             color: #333;
         }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .overlay.show {
+                display: block;
+            }
+
+            .main-content {
+                padding: 10px;
+                padding-top: 70px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+
+            canvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+            .stats {
+                min-width: auto;
+                width: 100%;
+                max-width: 400px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.2em;
+            }
+
+            .sidebar {
+                width: 280px;
+            }
+
+            .stat-item {
+                font-size: 0.85em;
+            }
+
+            button {
+                font-size: 0.9em;
+                padding: 10px;
+            }
+        }
+
+        /* 横向き対応 */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .main-content {
+                padding-top: 10px;
+            }
+
+            h1 {
+                font-size: 1.2em;
+                margin-bottom: 5px;
+            }
+
+            .stats {
+                margin-top: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <button class="menu-toggle" id="menu-toggle">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <div class="sidebar" id="sidebar">
         <h2>🎮 PID制御パラメータ</h2>
 
         <div class="control-group">
@@ -263,6 +382,36 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+
+        // Canvas サイズの調整
+        function resizeCanvas() {
+            const maxWidth = window.innerWidth > 768 ? 800 : window.innerWidth - 40;
+            const maxHeight = window.innerWidth > 768 ? 600 : window.innerHeight - 300;
+
+            canvas.width = Math.min(800, maxWidth);
+            canvas.height = Math.min(600, maxHeight);
+
+            // スケールの調整
+            scale = Math.min(canvas.width, canvas.height) / 8;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // メニュートグル
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        });
+
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        });
 
         // 物理パラメータ
         const params = {
@@ -367,6 +516,48 @@
         });
 
         canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // タッチイベント（モバイル対応）
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
+
+            const cartX = canvas.width / 2 + state.x * scale;
+            const cartY = canvas.height / 2;
+            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
+            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
+
+            const dist = Math.sqrt((touchX - pendulumX) ** 2 + (touchY - pendulumY) ** 2);
+
+            if (dist < 40) { // タッチ用に少し大きめ
+                isDragging = true;
+                dragStartY = touchY;
+                dragStartTheta = state.theta;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const touchY = touch.clientY - rect.top;
+                const deltaY = touchY - dragStartY;
+                state.theta = dragStartTheta + deltaY / scale;
+                state.theta_dot = 0;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('touchcancel', () => {
             isDragging = false;
         });
 
