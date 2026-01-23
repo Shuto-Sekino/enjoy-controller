@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倒立振子シミュレーター - 制御系を楽しく学ぼう</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #764ba2;
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            background: #764ba2;
+            transform: scale(1.2);
+        }
+
+        canvas {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info-box {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            min-width: 300px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>🎮 PID制御パラメータ</h2>
+
+        <div class="control-group">
+            <label>
+                比例ゲイン (Kp)
+                <span class="value-display" id="kp-value">50.0</span>
+            </label>
+            <input type="range" id="kp" min="0" max="200" value="50" step="0.1">
+        </div>
+
+        <div class="control-group">
+            <label>
+                積分ゲイン (Ki)
+                <span class="value-display" id="ki-value">0.0</span>
+            </label>
+            <input type="range" id="ki" min="0" max="50" value="0" step="0.1">
+        </div>
+
+        <div class="control-group">
+            <label>
+                微分ゲイン (Kd)
+                <span class="value-display" id="kd-value">10.0</span>
+            </label>
+            <input type="range" id="kd" min="0" max="50" value="10" step="0.1">
+        </div>
+
+        <div class="button-group">
+            <button id="reset">リセット</button>
+            <button id="disturbance">外乱を加える</button>
+        </div>
+
+        <div class="info-box">
+            <h3>📖 使い方</h3>
+            <p>• スライダーでPIDゲインを調整</p>
+            <p>• 振子をクリック/ドラッグして揺らす</p>
+            <p>• 「外乱を加える」でランダムな力を加える</p>
+            <p>• PIDゲインを調整して安定化させよう！</p>
+        </div>
+
+        <div class="info-box">
+            <h3>💡 ヒント</h3>
+            <p><strong>Kp:</strong> 偏差に比例した制御</p>
+            <p><strong>Ki:</strong> 偏差の積分で定常偏差を除去</p>
+            <p><strong>Kd:</strong> 偏差の変化率で振動を抑制</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <h1>🎯 倒立振子シミュレーター</h1>
+        <canvas id="canvas" width="800" height="600"></canvas>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">角度:</span>
+                <span class="stat-value" id="angle">0.0°</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">角速度:</span>
+                <span class="stat-value" id="angular-velocity">0.0 rad/s</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">制御入力:</span>
+                <span class="stat-value" id="control-input">0.0 N</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">カート位置:</span>
+                <span class="stat-value" id="cart-position">0.0 m</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 物理パラメータ
+        const params = {
+            M: 1.0,      // カートの質量 (kg)
+            m: 0.1,      // 振子の質量 (kg)
+            L: 1.0,      // 振子の長さ (m)
+            g: 9.81,     // 重力加速度 (m/s^2)
+            friction: 0.1 // 摩擦係数
+        };
+
+        // 状態変数
+        let state = {
+            x: 0,        // カート位置 (m)
+            x_dot: 0,    // カート速度 (m/s)
+            theta: 0.2,  // 振子の角度 (rad) 0が上向き
+            theta_dot: 0 // 角速度 (rad/s)
+        };
+
+        // PIDコントローラー
+        let pid = {
+            kp: 50.0,
+            ki: 0.0,
+            kd: 10.0,
+            integral: 0,
+            prev_error: 0
+        };
+
+        // シミュレーション設定
+        const dt = 0.01; // タイムステップ
+        let scale = 100;  // ピクセル/メートル
+        let isDragging = false;
+        let dragStartY = 0;
+        let dragStartTheta = 0;
+
+        // スライダーイベント
+        document.getElementById('kp').addEventListener('input', (e) => {
+            pid.kp = parseFloat(e.target.value);
+            document.getElementById('kp-value').textContent = pid.kp.toFixed(1);
+            pid.integral = 0; // ゲイン変更時に積分項をリセット
+        });
+
+        document.getElementById('ki').addEventListener('input', (e) => {
+            pid.ki = parseFloat(e.target.value);
+            document.getElementById('ki-value').textContent = pid.ki.toFixed(1);
+            pid.integral = 0;
+        });
+
+        document.getElementById('kd').addEventListener('input', (e) => {
+            pid.kd = parseFloat(e.target.value);
+            document.getElementById('kd-value').textContent = pid.kd.toFixed(1);
+        });
+
+        // ボタンイベント
+        document.getElementById('reset').addEventListener('click', () => {
+            state = {
+                x: 0,
+                x_dot: 0,
+                theta: 0.2,
+                theta_dot: 0
+            };
+            pid.integral = 0;
+            pid.prev_error = 0;
+        });
+
+        document.getElementById('disturbance').addEventListener('click', () => {
+            state.theta_dot += (Math.random() - 0.5) * 10;
+            state.x_dot += (Math.random() - 0.5) * 2;
+        });
+
+        // マウスイベント
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const cartX = canvas.width / 2 + state.x * scale;
+            const cartY = canvas.height / 2;
+            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
+            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
+
+            const dist = Math.sqrt((mouseX - pendulumX) ** 2 + (mouseY - pendulumY) ** 2);
+
+            if (dist < 30) {
+                isDragging = true;
+                dragStartY = mouseY;
+                dragStartTheta = state.theta;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseY = e.clientY - rect.top;
+                const deltaY = mouseY - dragStartY;
+                state.theta = dragStartTheta + deltaY / scale;
+                state.theta_dot = 0;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // PID制御
+        function pidControl(error) {
+            pid.integral += error * dt;
+            // アンチワインドアップ
+            pid.integral = Math.max(-10, Math.min(10, pid.integral));
+
+            const derivative = (error - pid.prev_error) / dt;
+            pid.prev_error = error;
+
+            const output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
+            return output;
+        }
+
+        // 物理シミュレーション
+        function simulate(force) {
+            const { M, m, L, g, friction } = params;
+            const { theta, theta_dot, x_dot } = state;
+
+            const sin_theta = Math.sin(theta);
+            const cos_theta = Math.cos(theta);
+
+            // 運動方程式
+            const denominator = M + m * sin_theta * sin_theta;
+
+            const theta_ddot = (g * sin_theta + cos_theta * (
+                (-force - m * L * theta_dot * theta_dot * sin_theta + friction * x_dot) / (M + m)
+            )) / (L * (4/3 - m * cos_theta * cos_theta / (M + m)));
+
+            const x_ddot = (force + m * L * (theta_dot * theta_dot * sin_theta - theta_ddot * cos_theta) - friction * x_dot) / (M + m);
+
+            // オイラー法で状態更新
+            state.theta_dot += theta_ddot * dt;
+            state.theta += state.theta_dot * dt;
+            state.x_dot += x_ddot * dt;
+            state.x += state.x_dot * dt;
+
+            // カート位置の制限
+            const maxX = 3.5;
+            if (Math.abs(state.x) > maxX) {
+                state.x = Math.sign(state.x) * maxX;
+                state.x_dot = 0;
+            }
+        }
+
+        // 描画
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // レール
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(50, centerY + 30);
+            ctx.lineTo(canvas.width - 50, centerY + 30);
+            ctx.stroke();
+
+            // カート位置
+            const cartX = centerX + state.x * scale;
+            const cartY = centerY;
+
+            // カート
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(cartX - 40, cartY - 20, 80, 40);
+            ctx.strokeStyle = '#2980b9';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(cartX - 40, cartY - 20, 80, 40);
+
+            // 車輪
+            ctx.fillStyle = '#34495e';
+            ctx.beginPath();
+            ctx.arc(cartX - 25, cartY + 20, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cartX + 25, cartY + 20, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 振子
+            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
+            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
+
+            // 振子の棒
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(cartX, cartY);
+            ctx.lineTo(pendulumX, pendulumY);
+            ctx.stroke();
+
+            // 振子の重り
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(pendulumX, pendulumY, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#c0392b';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 支点
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.arc(cartX, cartY, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 目標角度の表示（垂直線）
+            ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(cartX, cartY);
+            ctx.lineTo(cartX, cartY - params.L * scale);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 統計情報の更新
+        function updateStats(controlForce) {
+            document.getElementById('angle').textContent = (state.theta * 180 / Math.PI).toFixed(1) + '°';
+            document.getElementById('angular-velocity').textContent = state.theta_dot.toFixed(2) + ' rad/s';
+            document.getElementById('control-input').textContent = controlForce.toFixed(2) + ' N';
+            document.getElementById('cart-position').textContent = state.x.toFixed(2) + ' m';
+        }
+
+        // メインループ
+        function loop() {
+            if (!isDragging) {
+                // PID制御による力の計算
+                const error = -state.theta; // 目標は0（垂直）
+                const controlForce = pidControl(error);
+
+                // 物理シミュレーション
+                simulate(controlForce);
+
+                // 統計情報更新
+                updateStats(controlForce);
+            }
+
+            // 描画
+            draw();
+
+            requestAnimationFrame(loop);
+        }
+
+        // 初期化
+        pid.prev_error = -state.theta;
+        loop();
+    </script>
+</body>
+</html>
