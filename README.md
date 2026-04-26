@@ -12,11 +12,12 @@ GitHub Pagesで公開中: [デモを見る](https://shuto-sekino.github.io/enjoy
 
 ### 1. 倒立振子シミュレーター
 
-PID制御を使った倒立振子のシミュレーターです。
+LQR状態フィードバック制御を使った倒立振子のシミュレーターです。
 
 **機能:**
 - リアルタイムアニメーション
-- PIDゲイン（Kp, Ki, Kd）の調整
+- 状態フィードバックゲイン（$k_x, k_{\dot{x}}, k_\theta, k_{\dot{\theta}}$）の調整
+- 目標位置 $x_\mathrm{ref}$ のスライダー操作
 - マウス/タッチで振子を揺らす
 - 外乱を加えるボタン
 - 状態のリアルタイム表示
@@ -29,16 +30,15 @@ PID制御を使った倒立振子のシミュレーターです。
 
 カートに乗った倒立振子（cart-pole）システムです。
 
-| 記号 | 意味 | デフォルト値 |
-|------|------|-------------|
-| $M$ | カートの質量 | 1.0 kg |
-| $m$ | 振子の質量 | 0.1 kg |
-| $L$ | 振子の長さ | 1.0 m |
-| $g$ | 重力加速度 | 9.81 m/s² |
-| $b$ | カートの摩擦係数 | 0.1 N·s/m |
-| $F$ | カートへの制御入力（力）| — N |
+| 記号 | 意味 | 値 | 単位 |
+|------|------|-----|------|
+| $M$ | カートの質量 | 1.0 | kg |
+| $m$ | 振子の質量 | 0.1 | kg |
+| $L$ | 振子の長さ | 1.0 | m |
+| $g$ | 重力加速度 | 9.81 | m/s² |
+| $b$ | カートの摩擦係数 | 0.1 | N·s/m |
 
-**状態変数:**
+**状態変数と制御入力:**
 
 | 記号 | 意味 |
 |------|------|
@@ -46,22 +46,25 @@ PID制御を使った倒立振子のシミュレーターです。
 | $\dot{x}$ | カートの速度 (m/s) |
 | $\theta$ | 振子の傾き角 (rad)、$\theta=0$ が直立 |
 | $\dot{\theta}$ | 振子の角速度 (rad/s) |
+| $u = F$ | カートへの制御入力 (N) |
 
 ---
 
-### 非線形運動方程式
+### 非線形運動方程式（Euler-Lagrange）
 
-Euler-Lagrange法により導出した方程式です（振子を一様棒として扱い、重心周りの回転慣性を考慮）。
+振子を一様棒（質量 $m$、長さ $L$）としてラグランジアン法で導出します。
 
-**振子の角加速度:**
+**第1式（カートの並進）:**
 
-$$\ddot{\theta} = \frac{g\sin\theta + \cos\theta \cdot \dfrac{-F - mL\dot{\theta}^2\sin\theta + b\dot{x}}{M+m}}{L\!\left(\dfrac{4}{3} - \dfrac{m\cos^2\theta}{M+m}\right)}$$
+$$( M + m)\ddot{x} + \frac{mL}{2}\!\left(\ddot{\theta}\cos\theta - \dot{\theta}^2\sin\theta\right) = F - b\dot{x}$$
 
-**カートの加速度:**
+左辺 = カート全体の慣性力 + 振子がカートに及ぼす反力、右辺 = 外力 $F$ − 摩擦 $b\dot{x}$
 
-$$\ddot{x} = \frac{F + mL\!\left(\dot{\theta}^2\sin\theta - \ddot{\theta}\cos\theta\right) - b\dot{x}}{M+m}$$
+**第2式（振子の回転）:**
 
-> 分母の $4/3$ は振子を一様棒として扱ったときの慣性モーメント $I = \frac{1}{3}mL^2$（支点周り）に由来します。
+$$\frac{mL^2}{3}\,\ddot{\theta} + \frac{mL}{2}\,\ddot{x}\cos\theta = \frac{mgL}{2}\sin\theta$$
+
+左辺 = 支点周りの回転慣性（$I = \tfrac{1}{3}mL^2$）+ カート加速度による慣性結合、右辺 = 重力トルク
 
 ---
 
@@ -73,13 +76,19 @@ $$\sin\theta \approx \theta, \quad \cos\theta \approx 1, \quad \dot{\theta}^2\si
 
 変数 $p = 4M + m$ と置くと：
 
-**線形化された振子の角加速度:**
+**線形化された第1式:**
 
-$$\ddot{\theta} = \frac{3g(M+m)}{Lp}\,\theta + \frac{3b}{Lp}\,\dot{x} - \frac{3}{Lp}\,F$$
+$$( M + m)\ddot{x} + \frac{mL}{2}\ddot{\theta} = F - b\dot{x}$$
 
-**線形化されたカートの加速度:**
+**線形化された第2式:**
+
+$$\frac{mL^2}{3}\,\ddot{\theta} + \frac{mL}{2}\,\ddot{x} = \frac{mgL}{2}\theta$$
+
+これら2式を $\ddot{x}$、$\ddot{\theta}$ について解くと：
 
 $$\ddot{x} = -\frac{3mg}{p}\,\theta - \frac{4b}{p}\,\dot{x} + \frac{4}{p}\,F$$
+
+$$\ddot{\theta} = \frac{3g(M+m)}{Lp}\,\theta + \frac{3b}{Lp}\,\dot{x} - \frac{3}{Lp}\,F$$
 
 ---
 
@@ -89,9 +98,9 @@ $$\dot{\mathbf{x}} = A\mathbf{x} + Bu, \quad \mathbf{x} = \begin{bmatrix} x \\ \
 
 $$A = \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 & -\dfrac{4b}{p} & -\dfrac{3mg}{p} & 0 \\ 0 & 0 & 0 & 1 \\ 0 & \dfrac{3b}{Lp} & \dfrac{3g(M+m)}{Lp} & 0 \end{bmatrix}, \quad B = \begin{bmatrix} 0 \\ \dfrac{4}{p} \\ 0 \\ -\dfrac{3}{Lp} \end{bmatrix}$$
 
-**デフォルトパラメータでの数値:**
+**デフォルトパラメータでの数値（$p = 4.1$）:**
 
-$$A \approx \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 & -0.098 & -0.718 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0.073 & 7.896 & 0 \end{bmatrix}, \quad B \approx \begin{bmatrix} 0 \\ 0.976 \\ 0 \\ -0.732 \end{bmatrix}$$
+$$A \approx \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 & -0.10 & -0.72 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0.07 & 7.90 & 0 \end{bmatrix}, \quad B \approx \begin{bmatrix} 0 \\ 0.98 \\ 0 \\ -0.73 \end{bmatrix}$$
 
 $A$ の固有値は $\{0,\; 0,\; +2.81,\; -2.81\}$ 程度であり、$+2.81$ の不安定極が存在するため制御なしでは転倒します。
 
@@ -101,17 +110,21 @@ $A$ の固有値は $\{0,\; 0,\; +2.81,\; -2.81\}$ 程度であり、$+2.81$ の
 
 ### 状態フィードバック制御則
 
-$$u = -K\mathbf{x} = -\begin{bmatrix} k_1 & k_2 & k_3 & k_4 \end{bmatrix} \begin{bmatrix} x \\ \dot{x} \\ \theta \\ \dot{\theta} \end{bmatrix}$$
+目標位置 $x_\mathrm{ref}$ への追従を含む制御則：
 
-閉ループ系は $\dot{\mathbf{x}} = (A - BK)\mathbf{x}$ となり、$K$ を適切に設計することで全ての固有値を左半平面に配置できます。
+$$u = -K(\mathbf{x} - \mathbf{x}_\mathrm{ref}), \quad \mathbf{x}_\mathrm{ref} = \begin{bmatrix} x_\mathrm{ref} \\ 0 \\ 0 \\ 0 \end{bmatrix}$$
+
+$$F = k_x(x - x_\mathrm{ref}) + k_{\dot{x}}\dot{x} + k_\theta\,\theta + k_{\dot{\theta}}\,\dot{\theta}$$
+
+閉ループ系は $\dot{\mathbf{e}} = (A - BK)\mathbf{e}$（$\mathbf{e} = \mathbf{x} - \mathbf{x}_\mathrm{ref}$）となり、$K$ を適切に設計することで全ての固有値を左半平面に配置できます。
 
 ### LQR（Linear Quadratic Regulator）
 
 LQRは以下の二次形式コスト関数を最小化するゲイン $K$ を求めます。
 
-$$J = \int_0^\infty \!\left(\mathbf{x}^T Q\,\mathbf{x} + u^T R\,u\right) dt$$
+$$J = \int_0^\infty \!\left(\mathbf{e}^T Q\,\mathbf{e} + u^T R\,u\right) dt$$
 
-- $Q \succeq 0$：状態への重み行列（大きいほど状態偏差を小さくしようとする）
+- $Q \succeq 0$：状態偏差への重み行列（大きいほど偏差を小さくしようとする）
 - $R \succ 0$：制御入力への重み（大きいほど省エネな制御になる）
 
 最適ゲインは**代数リカッチ方程式 (Algebraic Riccati Equation, ARE)** の解 $P$ から得られます。
@@ -125,7 +138,7 @@ $$\boxed{K = R^{-1}B^T P}$$
 | 設計方針 | $Q$ の設定 | 結果 |
 |----------|-----------|------|
 | 角度を最優先 | $Q_{33}$ を大きく | 振子が素早く直立するが、カートが動く |
-| 位置も制御 | $Q_{11}$ も加える | カートを原点近傍に保つ |
+| 位置も制御 | $Q_{11}$ も加える | カートを目標位置近傍に保つ |
 | 省エネ重視 | $R$ を大きく | 小さい力でゆっくり安定化 |
 | 応答性重視 | $R$ を小さく | 大きい力で素早く安定化 |
 
@@ -141,10 +154,10 @@ p = 4 * M + m  # = 4.1
 
 # 状態空間行列
 A = np.array([
-    [0,          1,              0,                    0],
-    [0, -4*b/p,     -3*m*g/p,          0],
-    [0,          0,              0,                    1],
-    [0,  3*b/(L*p),  3*g*(M+m)/(L*p),  0],
+    [0,          1,              0,                   0],
+    [0, -4*b/p,     -3*m*g/p,         0],
+    [0,          0,              0,                   1],
+    [0,  3*b/(L*p),  3*g*(M+m)/(L*p), 0],
 ])
 
 B = np.array([[0], [4/p], [0], [-3/(L*p)]])
@@ -160,7 +173,7 @@ P = solve_continuous_are(A, B, Q, R)
 # 最適ゲイン
 K = np.linalg.inv(R) @ B.T @ P
 print(f"LQR gains: K = {K.flatten()}")
-# 例: K ≈ [-1.00, -2.40, 47.1, 9.81]
+# K = [-1.00, -2.74, -40.05, -14.37]
 
 # 安定性確認（閉ループ固有値）
 eigenvalues = np.linalg.eigvals(A - B @ K)
@@ -184,40 +197,26 @@ print(f"Controllability rank: {rank} / {n}")  # n と一致すれば可制御
 
 ---
 
-### PID制御との比較
-
-| 観点 | PID制御 | LQR（状態フィードバック） |
-|------|---------|--------------------------|
-| 設計情報 | 不要 | 数学モデルが必要 |
-| 調整パラメータ | $K_p, K_i, K_d$ | 重み行列 $Q, R$ |
-| 使用する状態量 | $\theta$（角度のみ） | $x, \dot{x}, \theta, \dot{\theta}$（全状態） |
-| 最適性 | 保証なし | コスト関数に対して最適 |
-| 外乱への応答 | 積分項で定常偏差除去 | 積分器を別途追加する必要あり |
-| 実装の簡便さ | シンプル | 全状態の計測/推定が必要 |
-
-> 現在のシミュレーターはPID制御を採用しています。LQRゲインを実装する場合は `pidControl()` を状態フィードバック則 $u = -K\mathbf{x}$ で置き換えてください。
-
----
-
 ## 技術スタック
 
 - Pure HTML/CSS/JavaScript
 - Canvas API for animations
+- KaTeX for math rendering
 - GitHub Pages for hosting
 
 ## 使い方
 
 1. [デモサイト](https://shuto-sekino.github.io/enjoy-controller/)にアクセス
-2. サイドバーのスライダーでPIDゲインを調整
+2. 「目標位置」スライダーでカートの目標位置を設定
 3. 振子をクリック/ドラッグして揺らしてみる
-4. 最適なゲインを見つけて安定化させよう
+4. 「外乱を加える」で動作を確認
+5. 「LQR 最適ゲイン設定」ボタンで最適ゲインを適用
 
 ## 今後の予定
 
-- [ ] LQR状態フィードバック制御の実装
+- [x] LQR状態フィードバック制御の実装
 - [ ] 極配置法（Pole Placement）の実装
 - [ ] オブザーバー（カルマンフィルタ）による状態推定
-- [ ] プリセットゲイン設定（PID / LQR）
 - [ ] 他の制御システム（モーター制御、温度制御など）
 
 ## ライセンス
