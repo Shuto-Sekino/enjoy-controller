@@ -431,9 +431,32 @@
         <div class="sidebar" id="sidebar">
             <h2>🎮 状態フィードバック制御</h2>
             <p style="font-size: 0.8em; color: #888; margin-bottom: 16px">
-                制御則: F = k<sub>x</sub>·x + k<sub>ẋ</sub>·ẋ + k<sub>θ</sub>·θ
-                + k<sub>θ̇</sub>·θ̇
+                制御則: F = k<sub>x</sub>·(x−x<sub>ref</sub>) + k<sub>ẋ</sub>·ẋ
+                + k<sub>θ</sub>·θ + k<sub>θ̇</sub>·θ̇
             </p>
+
+            <div class="control-group">
+                <label>
+                    目標位置 x<sub>ref</sub>
+                    <span class="value-display" id="target-x-value">0.0</span>
+                </label>
+                <input
+                    type="range"
+                    id="target-x"
+                    min="-3"
+                    max="3"
+                    value="0"
+                    step="0.1"
+                />
+            </div>
+
+            <hr
+                style="
+                    border: none;
+                    border-top: 1px solid #eee;
+                    margin: 4px 0 20px;
+                "
+            />
 
             <div class="control-group">
                 <label>
@@ -755,6 +778,9 @@
                 theta_dot: 0, // 角速度 (rad/s)
             };
 
+            // 目標位置
+            let targetX = 0;
+
             // 状態フィードバックゲイン（LQR最適値: K=[-1,-2.74,-40.05,-14.37] → u=-Kx）
             const LQR_OPTIMAL = {
                 kx: 1.0,
@@ -782,6 +808,14 @@
             bindSlider("kxdot", "kxdot", 1);
             bindSlider("ktheta", "ktheta", 1);
             bindSlider("kthetadot", "kthetadot", 1);
+
+            document
+                .getElementById("target-x")
+                .addEventListener("input", (e) => {
+                    targetX = parseFloat(e.target.value);
+                    document.getElementById("target-x-value").textContent =
+                        targetX.toFixed(1);
+                });
 
             function applyGains(g) {
                 gains = { ...g };
@@ -920,10 +954,10 @@
                 isDragging = false;
             });
 
-            // 状態フィードバック制御 u = -K·x（LQR）
+            // 状態フィードバック制御 u = -K·(x - x_ref)（LQR）
             function stateFeedback() {
                 return (
-                    gains.kx * state.x +
+                    gains.kx * (state.x - targetX) +
                     gains.kxdot * state.x_dot +
                     gains.ktheta * state.theta +
                     gains.kthetadot * state.theta_dot
@@ -997,6 +1031,38 @@
                     centerY + cartHeight / 2 + wheelRadius,
                 );
                 ctx.stroke();
+
+                // 目標位置マーカー
+                const targetCanvasX = centerX + targetX * scale;
+                const railY =
+                    centerY +
+                    Math.max(20, scale * 0.4) / 2 +
+                    Math.max(5, scale * 0.1);
+                ctx.strokeStyle = "rgba(46, 204, 113, 0.6)";
+                ctx.lineWidth = Math.max(1, scale * 0.025);
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(targetCanvasX, railY - Math.max(5, scale * 0.1) * 2);
+                ctx.lineTo(
+                    targetCanvasX,
+                    centerY - Math.max(20, scale * 0.4) / 2 - 10,
+                );
+                ctx.stroke();
+                ctx.setLineDash([]);
+                const triSize = Math.max(6, scale * 0.12);
+                ctx.fillStyle = "rgba(46, 204, 113, 0.85)";
+                ctx.beginPath();
+                ctx.moveTo(targetCanvasX, railY - Math.max(5, scale * 0.1) * 2);
+                ctx.lineTo(
+                    targetCanvasX - triSize,
+                    railY - Math.max(5, scale * 0.1) * 2 - triSize * 1.5,
+                );
+                ctx.lineTo(
+                    targetCanvasX + triSize,
+                    railY - Math.max(5, scale * 0.1) * 2 - triSize * 1.5,
+                );
+                ctx.closePath();
+                ctx.fill();
 
                 // カート位置
                 const cartX = centerX + state.x * scale;
