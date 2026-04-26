@@ -184,6 +184,15 @@
             font-size: 1.1em;
         }
 
+        .btn-optimal {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            margin-top: 10px;
+        }
+
+        .btn-optimal:hover {
+            background: linear-gradient(135deg, #0d7a70, #2bc96a);
+        }
+
         .stats {
             background: rgba(255, 255, 255, 0.9);
             padding: 15px;
@@ -308,50 +317,63 @@
     <div class="overlay" id="overlay"></div>
 
     <div class="sidebar" id="sidebar">
-        <h2>🎮 PID制御パラメータ</h2>
+        <h2>🎮 状態フィードバック制御</h2>
+        <p style="font-size:0.8em;color:#888;margin-bottom:16px;">制御則: F = k<sub>x</sub>·x + k<sub>ẋ</sub>·ẋ + k<sub>θ</sub>·θ + k<sub>θ̇</sub>·θ̇</p>
 
         <div class="control-group">
             <label>
-                比例ゲイン (Kp)
-                <span class="value-display" id="kp-value">50.0</span>
+                位置ゲイン k<sub>x</sub>
+                <span class="value-display" id="kx-value">1.0</span>
             </label>
-            <input type="range" id="kp" min="0" max="200" value="50" step="0.1">
+            <input type="range" id="kx" min="-5" max="10" value="1.0" step="0.1">
         </div>
 
         <div class="control-group">
             <label>
-                積分ゲイン (Ki)
-                <span class="value-display" id="ki-value">0.0</span>
+                速度ゲイン k<sub>ẋ</sub>
+                <span class="value-display" id="kxdot-value">2.7</span>
             </label>
-            <input type="range" id="ki" min="0" max="50" value="0" step="0.1">
+            <input type="range" id="kxdot" min="-10" max="15" value="2.74" step="0.1">
         </div>
 
         <div class="control-group">
             <label>
-                微分ゲイン (Kd)
-                <span class="value-display" id="kd-value">10.0</span>
+                角度ゲイン k<sub>θ</sub>
+                <span class="value-display" id="ktheta-value">40.0</span>
             </label>
-            <input type="range" id="kd" min="0" max="50" value="10" step="0.1">
+            <input type="range" id="ktheta" min="0" max="100" value="40.05" step="0.5">
         </div>
 
-        <div class="button-group">
-            <button id="reset">リセット</button>
-            <button id="disturbance">外乱を加える</button>
+        <div class="control-group">
+            <label>
+                角速度ゲイン k<sub>θ̇</sub>
+                <span class="value-display" id="kthetadot-value">14.4</span>
+            </label>
+            <input type="range" id="kthetadot" min="0" max="30" value="14.37" step="0.1">
+        </div>
+
+        <div class="button-group" style="flex-direction:column;">
+            <button id="set-optimal" class="btn-optimal">LQR 最適ゲイン設定</button>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button id="reset">リセット</button>
+                <button id="disturbance">外乱を加える</button>
+            </div>
         </div>
 
         <div class="info-box">
             <h3>📖 使い方</h3>
-            <p>• スライダーでPIDゲインを調整</p>
+            <p>• スライダーでゲインを調整</p>
             <p>• 振子をクリック/ドラッグして揺らす</p>
             <p>• 「外乱を加える」でランダムな力を加える</p>
-            <p>• PIDゲインを調整して安定化させよう！</p>
+            <p>• 「LQR最適ゲイン設定」で最適値を適用</p>
         </div>
 
         <div class="info-box">
-            <h3>💡 ヒント</h3>
-            <p><strong>Kp:</strong> 偏差に比例した制御</p>
-            <p><strong>Ki:</strong> 偏差の積分で定常偏差を除去</p>
-            <p><strong>Kd:</strong> 偏差の変化率で振動を抑制</p>
+            <h3>💡 各ゲインの役割</h3>
+            <p><strong>k<sub>x</sub>:</strong> カート位置の補正</p>
+            <p><strong>k<sub>ẋ</sub>:</strong> カート速度の減衰</p>
+            <p><strong>k<sub>θ</sub>:</strong> 振子角度の安定化（最重要）</p>
+            <p><strong>k<sub>θ̇</sub>:</strong> 振子角速度の減衰</p>
         </div>
     </div>
 
@@ -382,6 +404,8 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+
+        let scale = 100;  // ピクセル/メートル
 
         // Canvas サイズの調整
         function resizeCanvas() {
@@ -446,38 +470,42 @@
             theta_dot: 0 // 角速度 (rad/s)
         };
 
-        // PIDコントローラー
-        let pid = {
-            kp: 50.0,
-            ki: 0.0,
-            kd: 10.0,
-            integral: 0,
-            prev_error: 0
-        };
+        // 状態フィードバックゲイン（LQR最適値: K=[-1,-2.74,-40.05,-14.37] → u=-Kx）
+        const LQR_OPTIMAL = { kx: 1.0, kxdot: 2.74, ktheta: 40.05, kthetadot: 14.37 };
+        let gains = { ...LQR_OPTIMAL };
 
         // シミュレーション設定
         const dt = 0.01; // タイムステップ
-        let scale = 100;  // ピクセル/メートル
         let isDragging = false;
         let dragStartY = 0;
         let dragStartTheta = 0;
 
         // スライダーイベント
-        document.getElementById('kp').addEventListener('input', (e) => {
-            pid.kp = parseFloat(e.target.value);
-            document.getElementById('kp-value').textContent = pid.kp.toFixed(1);
-            pid.integral = 0; // ゲイン変更時に積分項をリセット
-        });
+        function bindSlider(id, key, decimals) {
+            document.getElementById(id).addEventListener('input', (e) => {
+                gains[key] = parseFloat(e.target.value);
+                document.getElementById(id + '-value').textContent = gains[key].toFixed(decimals);
+            });
+        }
+        bindSlider('kx',       'kx',       1);
+        bindSlider('kxdot',    'kxdot',    1);
+        bindSlider('ktheta',   'ktheta',   1);
+        bindSlider('kthetadot','kthetadot',1);
 
-        document.getElementById('ki').addEventListener('input', (e) => {
-            pid.ki = parseFloat(e.target.value);
-            document.getElementById('ki-value').textContent = pid.ki.toFixed(1);
-            pid.integral = 0;
-        });
+        function applyGains(g) {
+            gains = { ...g };
+            document.getElementById('kx').value       = g.kx;
+            document.getElementById('kxdot').value    = g.kxdot;
+            document.getElementById('ktheta').value   = g.ktheta;
+            document.getElementById('kthetadot').value= g.kthetadot;
+            document.getElementById('kx-value').textContent       = g.kx.toFixed(1);
+            document.getElementById('kxdot-value').textContent    = g.kxdot.toFixed(1);
+            document.getElementById('ktheta-value').textContent   = g.ktheta.toFixed(1);
+            document.getElementById('kthetadot-value').textContent= g.kthetadot.toFixed(1);
+        }
 
-        document.getElementById('kd').addEventListener('input', (e) => {
-            pid.kd = parseFloat(e.target.value);
-            document.getElementById('kd-value').textContent = pid.kd.toFixed(1);
+        document.getElementById('set-optimal').addEventListener('click', () => {
+            applyGains(LQR_OPTIMAL);
         });
 
         // ボタンイベント
@@ -488,8 +516,6 @@
                 theta: 0.2,
                 theta_dot: 0
             };
-            pid.integral = 0;
-            pid.prev_error = 0;
         });
 
         document.getElementById('disturbance').addEventListener('click', () => {
@@ -579,17 +605,12 @@
             isDragging = false;
         });
 
-        // PID制御
-        function pidControl(error) {
-            pid.integral += error * dt;
-            // アンチワインドアップ
-            pid.integral = Math.max(-10, Math.min(10, pid.integral));
-
-            const derivative = (error - pid.prev_error) / dt;
-            pid.prev_error = error;
-
-            const output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
-            return output;
+        // 状態フィードバック制御 u = -K·x（LQR）
+        function stateFeedback() {
+            return gains.kx       * state.x
+                 + gains.kxdot    * state.x_dot
+                 + gains.ktheta   * state.theta
+                 + gains.kthetadot* state.theta_dot;
         }
 
         // 物理シミュレーション
@@ -715,9 +736,7 @@
         // メインループ
         function loop() {
             if (!isDragging) {
-                // PID制御による力の計算
-                const error = -state.theta; // 目標は0（垂直）
-                const controlForce = pidControl(error);
+                const controlForce = stateFeedback();
 
                 // 物理シミュレーション
                 simulate(controlForce);
@@ -732,8 +751,6 @@
             requestAnimationFrame(loop);
         }
 
-        // 初期化
-        pid.prev_error = -state.theta;
         loop();
     </script>
 </body>
