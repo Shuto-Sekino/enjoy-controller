@@ -1,757 +1,1129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>倒立振子シミュレーター - 制御系を楽しく学ぼう</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>倒立振子シミュレーター - 制御系を楽しく学ぼう</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        />
+        <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        ></script>
+        <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+            onload="
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                    ],
+                })
+            "
+        ></script>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .sidebar {
-            width: 300px;
-            background: white;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            overflow-y: auto;
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
-        }
-
-        .menu-toggle {
-            display: none;
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 1001;
-            background: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 15px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            font-size: 1.5em;
-        }
-
-        .menu-toggle:active {
-            transform: scale(0.95);
-        }
-
-        h1 {
-            color: white;
-            margin-bottom: 20px;
-            text-align: center;
-            font-size: 2em;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5em;
-        }
-
-        .control-group {
-            margin-bottom: 25px;
-        }
-
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 600;
-        }
-
-        .value-display {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.9em;
-            margin-left: 10px;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: #ddd;
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #667eea;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            background: #764ba2;
-            transform: scale(1.2);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #667eea;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-        }
-
-        input[type="range"]::-moz-range-thumb:hover {
-            background: #764ba2;
-            transform: scale(1.2);
-        }
-
-        canvas {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-        }
-
-        .button-group {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            background: #667eea;
-            color: white;
-            font-size: 1em;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 600;
-        }
-
-        button:hover {
-            background: #764ba2;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .info-box {
-            background: #f0f0f0;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #666;
-        }
-
-        .info-box h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-
-        .btn-optimal {
-            background: linear-gradient(135deg, #11998e, #38ef7d);
-            margin-top: 10px;
-        }
-
-        .btn-optimal:hover {
-            background: linear-gradient(135deg, #0d7a70, #2bc96a);
-        }
-
-        .stats {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            min-width: 300px;
-        }
-
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 0.9em;
-        }
-
-        .stat-label {
-            color: #666;
-        }
-
-        .stat-value {
-            font-weight: bold;
-            color: #333;
-        }
-
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        /* モバイル対応 */
-        @media (max-width: 768px) {
             body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                height: 100vh;
+                display: flex;
+                overflow: hidden;
+            }
+
+            .sidebar {
+                width: 300px;
+                background: white;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+                overflow-y: auto;
+                transition: transform 0.3s ease;
+                z-index: 1000;
+            }
+
+            .main-content {
+                flex: 1;
+                display: flex;
                 flex-direction: column;
+                align-items: center;
+                justify-content: flex-start;
+                padding: 30px 20px 60px;
+                position: relative;
+                overflow-y: auto;
             }
 
             .menu-toggle {
-                display: block;
-            }
-
-            .sidebar {
+                display: none;
                 position: fixed;
-                top: 0;
-                left: 0;
-                height: 100vh;
-                transform: translateX(-100%);
+                top: 20px;
+                left: 20px;
+                z-index: 1001;
+                background: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 15px;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                font-size: 1.5em;
             }
 
-            .sidebar.open {
-                transform: translateX(0);
-            }
-
-            .overlay.show {
-                display: block;
-            }
-
-            .main-content {
-                padding: 10px;
-                padding-top: 70px;
+            .menu-toggle:active {
+                transform: scale(0.95);
             }
 
             h1 {
+                color: white;
+                margin-bottom: 20px;
+                text-align: center;
+                font-size: 2em;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+
+            h2 {
+                color: #333;
+                margin-bottom: 20px;
                 font-size: 1.5em;
-                margin-bottom: 10px;
+            }
+
+            .control-group {
+                margin-bottom: 25px;
+            }
+
+            .control-group label {
+                display: block;
+                margin-bottom: 8px;
+                color: #555;
+                font-weight: 600;
+            }
+
+            .value-display {
+                display: inline-block;
+                background: #667eea;
+                color: white;
+                padding: 2px 10px;
+                border-radius: 12px;
+                font-size: 0.9em;
+                margin-left: 10px;
+            }
+
+            input[type="range"] {
+                width: 100%;
+                height: 6px;
+                border-radius: 3px;
+                background: #ddd;
+                outline: none;
+                -webkit-appearance: none;
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #667eea;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            input[type="range"]::-webkit-slider-thumb:hover {
+                background: #764ba2;
+                transform: scale(1.2);
+            }
+
+            input[type="range"]::-moz-range-thumb {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #667eea;
+                cursor: pointer;
+                border: none;
+                transition: all 0.2s;
+            }
+
+            input[type="range"]::-moz-range-thumb:hover {
+                background: #764ba2;
+                transform: scale(1.2);
             }
 
             canvas {
-                max-width: 100%;
-                height: auto;
+                background: white;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                cursor: pointer;
             }
 
-            .stats {
-                min-width: auto;
-                width: 100%;
-                max-width: 400px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 1.2em;
-            }
-
-            .sidebar {
-                width: 280px;
-            }
-
-            .stat-item {
-                font-size: 0.85em;
+            .button-group {
+                margin-top: 20px;
+                display: flex;
+                gap: 10px;
             }
 
             button {
+                flex: 1;
+                padding: 12px;
+                border: none;
+                border-radius: 8px;
+                background: #667eea;
+                color: white;
+                font-size: 1em;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-weight: 600;
+            }
+
+            button:hover {
+                background: #764ba2;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            button:active {
+                transform: translateY(0);
+            }
+
+            .info-box {
+                background: #f0f0f0;
+                padding: 15px;
+                border-radius: 8px;
+                margin-top: 20px;
                 font-size: 0.9em;
-                padding: 10px;
-            }
-        }
-
-        /* 横向き対応 */
-        @media (max-width: 768px) and (orientation: landscape) {
-            .main-content {
-                padding-top: 10px;
+                color: #666;
             }
 
-            h1 {
-                font-size: 1.2em;
-                margin-bottom: 5px;
+            .info-box h3 {
+                color: #333;
+                margin-bottom: 10px;
+                font-size: 1.1em;
+            }
+
+            .btn-optimal {
+                background: linear-gradient(135deg, #11998e, #38ef7d);
+                margin-top: 10px;
+            }
+
+            .btn-optimal:hover {
+                background: linear-gradient(135deg, #0d7a70, #2bc96a);
+            }
+
+            /* ── 数学モデルセクション ── */
+            .model-section {
+                width: 100%;
+                max-width: 800px;
+                margin-top: 30px;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 15px;
+                padding: 28px 30px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+
+            .model-section > h2 {
+                color: #333;
+                font-size: 1.25em;
+                margin-bottom: 22px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #667eea;
+            }
+
+            .model-subsection {
+                margin-bottom: 26px;
+            }
+
+            .model-subsection:last-child {
+                margin-bottom: 0;
+            }
+
+            .model-subsection h3 {
+                color: #444;
+                font-size: 0.95em;
+                font-weight: 700;
+                margin-bottom: 10px;
+                padding-left: 10px;
+                border-left: 3px solid #667eea;
+            }
+
+            .params-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.88em;
+            }
+
+            .params-table th,
+            .params-table td {
+                padding: 7px 12px;
+                border: 1px solid #e8e8e8;
+                text-align: left;
+            }
+
+            .params-table th {
+                background: #f0f2ff;
+                color: #333;
+                font-weight: 600;
+            }
+
+            .params-table tr:nth-child(even) td {
+                background: #fafafa;
+            }
+
+            .eq-block {
+                background: #f8f9ff;
+                border-left: 3px solid #a0aaee;
+                padding: 10px 16px;
+                margin: 8px 0;
+                border-radius: 0 8px 8px 0;
+                overflow-x: auto;
+            }
+
+            .eq-note {
+                font-size: 0.82em;
+                color: #888;
+                margin-top: 8px;
+            }
+
+            .matrix-row {
+                display: flex;
+                gap: 16px;
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
+
+            .matrix-row .eq-block {
+                flex: 1;
+                min-width: 220px;
             }
 
             .stats {
-                margin-top: 10px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <button class="menu-toggle" id="menu-toggle">☰</button>
-    <div class="overlay" id="overlay"></div>
-
-    <div class="sidebar" id="sidebar">
-        <h2>🎮 状態フィードバック制御</h2>
-        <p style="font-size:0.8em;color:#888;margin-bottom:16px;">制御則: F = k<sub>x</sub>·x + k<sub>ẋ</sub>·ẋ + k<sub>θ</sub>·θ + k<sub>θ̇</sub>·θ̇</p>
-
-        <div class="control-group">
-            <label>
-                位置ゲイン k<sub>x</sub>
-                <span class="value-display" id="kx-value">1.0</span>
-            </label>
-            <input type="range" id="kx" min="-5" max="10" value="1.0" step="0.1">
-        </div>
-
-        <div class="control-group">
-            <label>
-                速度ゲイン k<sub>ẋ</sub>
-                <span class="value-display" id="kxdot-value">2.7</span>
-            </label>
-            <input type="range" id="kxdot" min="-10" max="15" value="2.74" step="0.1">
-        </div>
-
-        <div class="control-group">
-            <label>
-                角度ゲイン k<sub>θ</sub>
-                <span class="value-display" id="ktheta-value">40.0</span>
-            </label>
-            <input type="range" id="ktheta" min="0" max="100" value="40.05" step="0.5">
-        </div>
-
-        <div class="control-group">
-            <label>
-                角速度ゲイン k<sub>θ̇</sub>
-                <span class="value-display" id="kthetadot-value">14.4</span>
-            </label>
-            <input type="range" id="kthetadot" min="0" max="30" value="14.37" step="0.1">
-        </div>
-
-        <div class="button-group" style="flex-direction:column;">
-            <button id="set-optimal" class="btn-optimal">LQR 最適ゲイン設定</button>
-            <div style="display:flex;gap:10px;margin-top:8px;">
-                <button id="reset">リセット</button>
-                <button id="disturbance">外乱を加える</button>
-            </div>
-        </div>
-
-        <div class="info-box">
-            <h3>📖 使い方</h3>
-            <p>• スライダーでゲインを調整</p>
-            <p>• 振子をクリック/ドラッグして揺らす</p>
-            <p>• 「外乱を加える」でランダムな力を加える</p>
-            <p>• 「LQR最適ゲイン設定」で最適値を適用</p>
-        </div>
-
-        <div class="info-box">
-            <h3>💡 各ゲインの役割</h3>
-            <p><strong>k<sub>x</sub>:</strong> カート位置の補正</p>
-            <p><strong>k<sub>ẋ</sub>:</strong> カート速度の減衰</p>
-            <p><strong>k<sub>θ</sub>:</strong> 振子角度の安定化（最重要）</p>
-            <p><strong>k<sub>θ̇</sub>:</strong> 振子角速度の減衰</p>
-        </div>
-    </div>
-
-    <div class="main-content">
-        <h1>🎯 倒立振子シミュレーター</h1>
-        <canvas id="canvas" width="800" height="600"></canvas>
-
-        <div class="stats">
-            <div class="stat-item">
-                <span class="stat-label">角度:</span>
-                <span class="stat-value" id="angle">0.0°</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">角速度:</span>
-                <span class="stat-value" id="angular-velocity">0.0 rad/s</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">制御入力:</span>
-                <span class="stat-value" id="control-input">0.0 N</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">カート位置:</span>
-                <span class="stat-value" id="cart-position">0.0 m</span>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        let scale = 100;  // ピクセル/メートル
-
-        // Canvas サイズの調整
-        function resizeCanvas() {
-            const isMobile = window.innerWidth <= 768;
-
-            if (isMobile) {
-                // モバイルの場合
-                const width = Math.min(window.innerWidth - 20, 600);
-
-                // 縦向きと横向きで高さを調整
-                const isLandscape = window.innerWidth > window.innerHeight;
-                const height = isLandscape
-                    ? Math.min(window.innerHeight - 100, 400)
-                    : Math.min(window.innerHeight - 250, 500);
-
-                canvas.width = width;
-                canvas.height = height;
-            } else {
-                // デスクトップの場合
-                canvas.width = 800;
-                canvas.height = 600;
+                background: rgba(255, 255, 255, 0.9);
+                padding: 15px;
+                border-radius: 10px;
+                margin-top: 20px;
+                min-width: 300px;
             }
 
-            // スケールの調整（振子が見えるように）
-            scale = Math.min(canvas.width, canvas.height) / 8;
-        }
+            .stat-item {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+                font-size: 0.9em;
+            }
 
-        resizeCanvas();
-        window.addEventListener('resize', () => {
+            .stat-label {
+                color: #666;
+            }
+
+            .stat-value {
+                font-weight: bold;
+                color: #333;
+            }
+
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+            }
+
+            /* モバイル対応 */
+            @media (max-width: 768px) {
+                body {
+                    flex-direction: column;
+                }
+
+                .menu-toggle {
+                    display: block;
+                }
+
+                .sidebar {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    height: 100vh;
+                    transform: translateX(-100%);
+                }
+
+                .sidebar.open {
+                    transform: translateX(0);
+                }
+
+                .overlay.show {
+                    display: block;
+                }
+
+                .main-content {
+                    padding: 10px;
+                    padding-top: 70px;
+                    overflow-y: auto;
+                }
+
+                .model-section {
+                    padding: 20px 16px;
+                }
+
+                h1 {
+                    font-size: 1.5em;
+                    margin-bottom: 10px;
+                }
+
+                canvas {
+                    max-width: 100%;
+                    height: auto;
+                }
+
+                .stats {
+                    min-width: auto;
+                    width: 100%;
+                    max-width: 400px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                h1 {
+                    font-size: 1.2em;
+                }
+
+                .sidebar {
+                    width: 280px;
+                }
+
+                .stat-item {
+                    font-size: 0.85em;
+                }
+
+                button {
+                    font-size: 0.9em;
+                    padding: 10px;
+                }
+            }
+
+            /* 横向き対応 */
+            @media (max-width: 768px) and (orientation: landscape) {
+                .main-content {
+                    padding-top: 10px;
+                }
+
+                h1 {
+                    font-size: 1.2em;
+                    margin-bottom: 5px;
+                }
+
+                .stats {
+                    margin-top: 10px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="overlay" id="overlay"></div>
+
+        <div class="sidebar" id="sidebar">
+            <h2>🎮 状態フィードバック制御</h2>
+            <p style="font-size: 0.8em; color: #888; margin-bottom: 16px">
+                制御則: F = k<sub>x</sub>·x + k<sub>ẋ</sub>·ẋ + k<sub>θ</sub>·θ
+                + k<sub>θ̇</sub>·θ̇
+            </p>
+
+            <div class="control-group">
+                <label>
+                    位置ゲイン k<sub>x</sub>
+                    <span class="value-display" id="kx-value">1.0</span>
+                </label>
+                <input
+                    type="range"
+                    id="kx"
+                    min="-5"
+                    max="10"
+                    value="1.0"
+                    step="0.1"
+                />
+            </div>
+
+            <div class="control-group">
+                <label>
+                    速度ゲイン k<sub>ẋ</sub>
+                    <span class="value-display" id="kxdot-value">2.7</span>
+                </label>
+                <input
+                    type="range"
+                    id="kxdot"
+                    min="-10"
+                    max="15"
+                    value="2.74"
+                    step="0.1"
+                />
+            </div>
+
+            <div class="control-group">
+                <label>
+                    角度ゲイン k<sub>θ</sub>
+                    <span class="value-display" id="ktheta-value">40.0</span>
+                </label>
+                <input
+                    type="range"
+                    id="ktheta"
+                    min="0"
+                    max="100"
+                    value="40.05"
+                    step="0.5"
+                />
+            </div>
+
+            <div class="control-group">
+                <label>
+                    角速度ゲイン k<sub>θ̇</sub>
+                    <span class="value-display" id="kthetadot-value">14.4</span>
+                </label>
+                <input
+                    type="range"
+                    id="kthetadot"
+                    min="0"
+                    max="30"
+                    value="14.37"
+                    step="0.1"
+                />
+            </div>
+
+            <div class="button-group" style="flex-direction: column">
+                <button id="set-optimal" class="btn-optimal">
+                    LQR 最適ゲイン設定
+                </button>
+                <div style="display: flex; gap: 10px; margin-top: 8px">
+                    <button id="reset">リセット</button>
+                    <button id="disturbance">外乱を加える</button>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>📖 使い方</h3>
+                <p>• スライダーでゲインを調整</p>
+                <p>• 振子をクリック/ドラッグして揺らす</p>
+                <p>• 「外乱を加える」でランダムな力を加える</p>
+                <p>• 「LQR最適ゲイン設定」で最適値を適用</p>
+            </div>
+
+            <div class="info-box">
+                <h3>💡 各ゲインの役割</h3>
+                <p><strong>k<sub>x</sub>:</strong> カート位置の補正</p>
+                <p><strong>k<sub>ẋ</sub>:</strong> カート速度の減衰</p>
+                <p>
+                    <strong>k<sub>θ</sub>:</strong> 振子角度の安定化（最重要）
+                </p>
+                <p><strong>k<sub>θ̇</sub>:</strong> 振子角速度の減衰</p>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1>🎯 倒立振子シミュレーター</h1>
+            <canvas id="canvas" width="800" height="600"></canvas>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">角度:</span>
+                    <span class="stat-value" id="angle">0.0°</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">角速度:</span>
+                    <span class="stat-value" id="angular-velocity"
+                        >0.0 rad/s</span
+                    >
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">制御入力:</span>
+                    <span class="stat-value" id="control-input">0.0 N</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">カート位置:</span>
+                    <span class="stat-value" id="cart-position">0.0 m</span>
+                </div>
+            </div>
+
+            <!-- ── 数学モデル ── -->
+            <div class="model-section">
+                <h2>📐 数学モデル</h2>
+
+                <div class="model-subsection">
+                    <h3>システムパラメータ</h3>
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>記号</th>
+                                <th>意味</th>
+                                <th>値</th>
+                                <th>単位</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>$M$</td>
+                                <td>カートの質量</td>
+                                <td>1.0</td>
+                                <td>kg</td>
+                            </tr>
+                            <tr>
+                                <td>$m$</td>
+                                <td>振子の質量</td>
+                                <td>0.1</td>
+                                <td>kg</td>
+                            </tr>
+                            <tr>
+                                <td>$L$</td>
+                                <td>振子の長さ</td>
+                                <td>1.0</td>
+                                <td>m</td>
+                            </tr>
+                            <tr>
+                                <td>$g$</td>
+                                <td>重力加速度</td>
+                                <td>9.81</td>
+                                <td>m/s²</td>
+                            </tr>
+                            <tr>
+                                <td>$b$</td>
+                                <td>カートの摩擦係数</td>
+                                <td>0.1</td>
+                                <td>N·s/m</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="model-subsection">
+                    <h3>状態ベクトルと制御入力</h3>
+                    <div class="eq-block">
+                        $$\mathbf{x} = \begin{bmatrix} x \\ \dot{x} \\ \theta \\
+                        \dot{\theta} \end{bmatrix}, \qquad u = F \text{ [N]}$$
+                    </div>
+                    <p class="eq-note">
+                        $\theta = 0$ が直立平衡点。$\theta > 0$
+                        で振子が右側に傾く。
+                    </p>
+                </div>
+
+                <div class="model-subsection">
+                    <h3>非線形運動方程式（Euler-Lagrange）</h3>
+                    <div class="eq-block">
+                        $$(M + m)\ddot{x} +
+                        \frac{mL}{2}\!\left(\ddot{\theta}\cos\theta -
+                        \dot{\theta}^2\sin\theta\right) = F - b\dot{x}$$
+                    </div>
+                    <p class="eq-note">
+                        第1式（カートの並進）：左辺 = カート全体の慣性力 +
+                        振子がカートに及ぼす反力、右辺 = 外力 $F$ − 摩擦
+                        $b\dot{x}$
+                    </p>
+                    <div class="eq-block">
+                        $$\frac{mL^2}{3}\,\ddot{\theta} +
+                        \frac{mL}{2}\,\ddot{x}\cos\theta =
+                        \frac{mgL}{2}\sin\theta$$
+                    </div>
+                    <p class="eq-note">
+                        第2式（振子の回転）：左辺 = 支点周りの回転慣性（$I =
+                        \tfrac{1}{3}mL^2$）+ カート加速度による慣性、右辺 =
+                        重力トルク
+                    </p>
+                </div>
+
+                <div class="model-subsection">
+                    <h3>線形化状態空間モデル（$\theta \approx 0$）</h3>
+                    <div class="eq-block">
+                        $$\dot{\mathbf{x}} = A\mathbf{x} + Bu, \quad p = 4M + m
+                        = 4.1$$
+                    </div>
+                    <div class="matrix-row">
+                        <div class="eq-block">
+                            $$A = \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 &
+                            -\tfrac{4b}{p} & -\tfrac{3mg}{p} & 0 \\ 0 & 0 & 0 &
+                            1 \\ 0 & \tfrac{3b}{Lp} & \tfrac{3g(M{+}m)}{Lp} & 0
+                            \end{bmatrix} \approx \begin{bmatrix} 0 & 1 & 0 & 0
+                            \\ 0 & -0.10 & -0.72 & 0 \\ 0 & 0 & 0 & 1 \\ 0 &
+                            0.07 & 7.90 & 0 \end{bmatrix}$$
+                        </div>
+                        <div class="eq-block">
+                            $$B = \begin{bmatrix} 0 \\ \tfrac{4}{p} \\ 0 \\
+                            -\tfrac{3}{Lp} \end{bmatrix} \approx \begin{bmatrix}
+                            0 \\ 0.98 \\ 0 \\ -0.73 \end{bmatrix}$$
+                        </div>
+                    </div>
+                    <p class="eq-note">
+                        $A$ の固有値 $\approx \{0,\, 0,\, +2.81,\,
+                        -2.81\}$。不安定極 $+2.81$
+                        が存在するため制御なしでは転倒。
+                    </p>
+                </div>
+
+                <div class="model-subsection">
+                    <h3>LQR 最適ゲイン</h3>
+                    <div class="eq-block">
+                        $$\min_{u}\; J = \int_0^{\infty}\!\bigl(\mathbf{x}^T
+                        Q\,\mathbf{x} + u^T R\, u\bigr)\,dt, \quad Q =
+                        \mathrm{diag}(1,\,1,\,100,\,10),\quad R = 1$$
+                    </div>
+                    <div class="eq-block">
+                        $$K = R^{-1}B^T P = \begin{bmatrix} -1.00 & -2.74 &
+                        -40.05 & -14.37 \end{bmatrix}$$
+                    </div>
+                    <div class="eq-block">
+                        $$F = -K\mathbf{x} = 1.00\,x + 2.74\,\dot{x} +
+                        40.05\,\theta + 14.37\,\dot{\theta}$$
+                    </div>
+                    <p class="eq-note">
+                        $P$ は代数リカッチ方程式 $A^T P + PA - PBR^{-1}B^T P + Q
+                        = 0$ の正定解。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            let scale = 100; // ピクセル/メートル
+
+            // Canvas サイズの調整
+            function resizeCanvas() {
+                const isMobile = window.innerWidth <= 768;
+
+                if (isMobile) {
+                    // モバイルの場合
+                    const width = Math.min(window.innerWidth - 20, 600);
+
+                    // 縦向きと横向きで高さを調整
+                    const isLandscape = window.innerWidth > window.innerHeight;
+                    const height = isLandscape
+                        ? Math.min(window.innerHeight - 100, 400)
+                        : Math.min(window.innerHeight - 250, 500);
+
+                    canvas.width = width;
+                    canvas.height = height;
+                } else {
+                    // デスクトップの場合
+                    canvas.width = 800;
+                    canvas.height = 600;
+                }
+
+                // スケールの調整（振子が見えるように）
+                scale = Math.min(canvas.width, canvas.height) / 8;
+            }
+
             resizeCanvas();
-        });
-
-        // メニュートグル
-        const menuToggle = document.getElementById('menu-toggle');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('overlay');
-
-        menuToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('show');
-        });
-
-        overlay.addEventListener('click', () => {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('show');
-        });
-
-        // 物理パラメータ
-        const params = {
-            M: 1.0,      // カートの質量 (kg)
-            m: 0.1,      // 振子の質量 (kg)
-            L: 1.0,      // 振子の長さ (m)
-            g: 9.81,     // 重力加速度 (m/s^2)
-            friction: 0.1 // 摩擦係数
-        };
-
-        // 状態変数
-        let state = {
-            x: 0,        // カート位置 (m)
-            x_dot: 0,    // カート速度 (m/s)
-            theta: 0.2,  // 振子の角度 (rad) 0が上向き
-            theta_dot: 0 // 角速度 (rad/s)
-        };
-
-        // 状態フィードバックゲイン（LQR最適値: K=[-1,-2.74,-40.05,-14.37] → u=-Kx）
-        const LQR_OPTIMAL = { kx: 1.0, kxdot: 2.74, ktheta: 40.05, kthetadot: 14.37 };
-        let gains = { ...LQR_OPTIMAL };
-
-        // シミュレーション設定
-        const dt = 0.01; // タイムステップ
-        let isDragging = false;
-        let dragStartY = 0;
-        let dragStartTheta = 0;
-
-        // スライダーイベント
-        function bindSlider(id, key, decimals) {
-            document.getElementById(id).addEventListener('input', (e) => {
-                gains[key] = parseFloat(e.target.value);
-                document.getElementById(id + '-value').textContent = gains[key].toFixed(decimals);
+            window.addEventListener("resize", () => {
+                resizeCanvas();
             });
-        }
-        bindSlider('kx',       'kx',       1);
-        bindSlider('kxdot',    'kxdot',    1);
-        bindSlider('ktheta',   'ktheta',   1);
-        bindSlider('kthetadot','kthetadot',1);
 
-        function applyGains(g) {
-            gains = { ...g };
-            document.getElementById('kx').value       = g.kx;
-            document.getElementById('kxdot').value    = g.kxdot;
-            document.getElementById('ktheta').value   = g.ktheta;
-            document.getElementById('kthetadot').value= g.kthetadot;
-            document.getElementById('kx-value').textContent       = g.kx.toFixed(1);
-            document.getElementById('kxdot-value').textContent    = g.kxdot.toFixed(1);
-            document.getElementById('ktheta-value').textContent   = g.ktheta.toFixed(1);
-            document.getElementById('kthetadot-value').textContent= g.kthetadot.toFixed(1);
-        }
+            // メニュートグル
+            const menuToggle = document.getElementById("menu-toggle");
+            const sidebar = document.getElementById("sidebar");
+            const overlay = document.getElementById("overlay");
 
-        document.getElementById('set-optimal').addEventListener('click', () => {
-            applyGains(LQR_OPTIMAL);
-        });
+            menuToggle.addEventListener("click", () => {
+                sidebar.classList.toggle("open");
+                overlay.classList.toggle("show");
+            });
 
-        // ボタンイベント
-        document.getElementById('reset').addEventListener('click', () => {
-            state = {
-                x: 0,
-                x_dot: 0,
-                theta: 0.2,
-                theta_dot: 0
+            overlay.addEventListener("click", () => {
+                sidebar.classList.remove("open");
+                overlay.classList.remove("show");
+            });
+
+            // 物理パラメータ
+            const params = {
+                M: 1.0, // カートの質量 (kg)
+                m: 0.1, // 振子の質量 (kg)
+                L: 1.0, // 振子の長さ (m)
+                g: 9.81, // 重力加速度 (m/s^2)
+                friction: 0.1, // 摩擦係数
             };
-        });
 
-        document.getElementById('disturbance').addEventListener('click', () => {
-            state.theta_dot += (Math.random() - 0.5) * 10;
-            state.x_dot += (Math.random() - 0.5) * 2;
-        });
+            // 状態変数
+            let state = {
+                x: 0, // カート位置 (m)
+                x_dot: 0, // カート速度 (m/s)
+                theta: 0.2, // 振子の角度 (rad) 0が上向き
+                theta_dot: 0, // 角速度 (rad/s)
+            };
 
-        // マウスイベント
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            // 状態フィードバックゲイン（LQR最適値: K=[-1,-2.74,-40.05,-14.37] → u=-Kx）
+            const LQR_OPTIMAL = {
+                kx: 1.0,
+                kxdot: 2.74,
+                ktheta: 40.05,
+                kthetadot: 14.37,
+            };
+            let gains = { ...LQR_OPTIMAL };
 
-            const cartX = canvas.width / 2 + state.x * scale;
-            const cartY = canvas.height / 2;
-            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
-            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
+            // シミュレーション設定
+            const dt = 0.01; // タイムステップ
+            let isDragging = false;
+            let dragStartY = 0;
+            let dragStartTheta = 0;
 
-            const dist = Math.sqrt((mouseX - pendulumX) ** 2 + (mouseY - pendulumY) ** 2);
-            const hitRadius = Math.max(30, scale * 0.5);
-
-            if (dist < hitRadius) {
-                isDragging = true;
-                dragStartY = mouseY;
-                dragStartTheta = state.theta;
+            // スライダーイベント
+            function bindSlider(id, key, decimals) {
+                document.getElementById(id).addEventListener("input", (e) => {
+                    gains[key] = parseFloat(e.target.value);
+                    document.getElementById(id + "-value").textContent =
+                        gains[key].toFixed(decimals);
+                });
             }
-        });
+            bindSlider("kx", "kx", 1);
+            bindSlider("kxdot", "kxdot", 1);
+            bindSlider("ktheta", "ktheta", 1);
+            bindSlider("kthetadot", "kthetadot", 1);
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (isDragging) {
+            function applyGains(g) {
+                gains = { ...g };
+                document.getElementById("kx").value = g.kx;
+                document.getElementById("kxdot").value = g.kxdot;
+                document.getElementById("ktheta").value = g.ktheta;
+                document.getElementById("kthetadot").value = g.kthetadot;
+                document.getElementById("kx-value").textContent =
+                    g.kx.toFixed(1);
+                document.getElementById("kxdot-value").textContent =
+                    g.kxdot.toFixed(1);
+                document.getElementById("ktheta-value").textContent =
+                    g.ktheta.toFixed(1);
+                document.getElementById("kthetadot-value").textContent =
+                    g.kthetadot.toFixed(1);
+            }
+
+            document
+                .getElementById("set-optimal")
+                .addEventListener("click", () => {
+                    applyGains(LQR_OPTIMAL);
+                });
+
+            // ボタンイベント
+            document.getElementById("reset").addEventListener("click", () => {
+                state = {
+                    x: 0,
+                    x_dot: 0,
+                    theta: 0.2,
+                    theta_dot: 0,
+                };
+            });
+
+            document
+                .getElementById("disturbance")
+                .addEventListener("click", () => {
+                    state.theta_dot += (Math.random() - 0.5) * 10;
+                    state.x_dot += (Math.random() - 0.5) * 2;
+                });
+
+            // マウスイベント
+            canvas.addEventListener("mousedown", (e) => {
                 const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
-                const deltaY = mouseY - dragStartY;
-                state.theta = dragStartTheta + deltaY / scale;
-                state.theta_dot = 0;
+
+                const cartX = canvas.width / 2 + state.x * scale;
+                const cartY = canvas.height / 2;
+                const pendulumX =
+                    cartX + Math.sin(state.theta) * params.L * scale;
+                const pendulumY =
+                    cartY - Math.cos(state.theta) * params.L * scale;
+
+                const dist = Math.sqrt(
+                    (mouseX - pendulumX) ** 2 + (mouseY - pendulumY) ** 2,
+                );
+                const hitRadius = Math.max(30, scale * 0.5);
+
+                if (dist < hitRadius) {
+                    isDragging = true;
+                    dragStartY = mouseY;
+                    dragStartTheta = state.theta;
+                }
+            });
+
+            canvas.addEventListener("mousemove", (e) => {
+                if (isDragging) {
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseY = e.clientY - rect.top;
+                    const deltaY = mouseY - dragStartY;
+                    state.theta = dragStartTheta + deltaY / scale;
+                    state.theta_dot = 0;
+                }
+            });
+
+            canvas.addEventListener("mouseup", () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener("mouseleave", () => {
+                isDragging = false;
+            });
+
+            // タッチイベント（モバイル対応）
+            canvas.addEventListener(
+                "touchstart",
+                (e) => {
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    const touchX = touch.clientX - rect.left;
+                    const touchY = touch.clientY - rect.top;
+
+                    const cartX = canvas.width / 2 + state.x * scale;
+                    const cartY = canvas.height / 2;
+                    const pendulumX =
+                        cartX + Math.sin(state.theta) * params.L * scale;
+                    const pendulumY =
+                        cartY - Math.cos(state.theta) * params.L * scale;
+
+                    const dist = Math.sqrt(
+                        (touchX - pendulumX) ** 2 + (touchY - pendulumY) ** 2,
+                    );
+                    const hitRadius = Math.max(40, scale * 0.6); // タッチ用に少し大きめ
+
+                    if (dist < hitRadius) {
+                        isDragging = true;
+                        dragStartY = touchY;
+                        dragStartTheta = state.theta;
+                    }
+                },
+                { passive: false },
+            );
+
+            canvas.addEventListener(
+                "touchmove",
+                (e) => {
+                    e.preventDefault();
+                    if (isDragging) {
+                        const rect = canvas.getBoundingClientRect();
+                        const touch = e.touches[0];
+                        const touchY = touch.clientY - rect.top;
+                        const deltaY = touchY - dragStartY;
+                        state.theta = dragStartTheta + deltaY / scale;
+                        state.theta_dot = 0;
+                    }
+                },
+                { passive: false },
+            );
+
+            canvas.addEventListener("touchend", () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener("touchcancel", () => {
+                isDragging = false;
+            });
+
+            // 状態フィードバック制御 u = -K·x（LQR）
+            function stateFeedback() {
+                return (
+                    gains.kx * state.x +
+                    gains.kxdot * state.x_dot +
+                    gains.ktheta * state.theta +
+                    gains.kthetadot * state.theta_dot
+                );
             }
-        });
 
-        canvas.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
+            // 物理シミュレーション
+            function simulate(force) {
+                const { M, m, L, g, friction } = params;
+                const { theta, theta_dot, x_dot } = state;
 
-        canvas.addEventListener('mouseleave', () => {
-            isDragging = false;
-        });
+                const sin_theta = Math.sin(theta);
+                const cos_theta = Math.cos(theta);
 
-        // タッチイベント（モバイル対応）
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
+                // 運動方程式
+                const denominator = M + m * sin_theta * sin_theta;
 
-            const cartX = canvas.width / 2 + state.x * scale;
-            const cartY = canvas.height / 2;
-            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
-            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
+                const theta_ddot =
+                    (g * sin_theta +
+                        cos_theta *
+                            ((-force -
+                                m * L * theta_dot * theta_dot * sin_theta +
+                                friction * x_dot) /
+                                (M + m))) /
+                    (L * (4 / 3 - (m * cos_theta * cos_theta) / (M + m)));
 
-            const dist = Math.sqrt((touchX - pendulumX) ** 2 + (touchY - pendulumY) ** 2);
-            const hitRadius = Math.max(40, scale * 0.6); // タッチ用に少し大きめ
+                const x_ddot =
+                    (force +
+                        m *
+                            L *
+                            (theta_dot * theta_dot * sin_theta -
+                                theta_ddot * cos_theta) -
+                        friction * x_dot) /
+                    (M + m);
 
-            if (dist < hitRadius) {
-                isDragging = true;
-                dragStartY = touchY;
-                dragStartTheta = state.theta;
-            }
-        }, { passive: false });
+                // オイラー法で状態更新
+                state.theta_dot += theta_ddot * dt;
+                state.theta += state.theta_dot * dt;
+                state.x_dot += x_ddot * dt;
+                state.x += state.x_dot * dt;
 
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (isDragging) {
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches[0];
-                const touchY = touch.clientY - rect.top;
-                const deltaY = touchY - dragStartY;
-                state.theta = dragStartTheta + deltaY / scale;
-                state.theta_dot = 0;
-            }
-        }, { passive: false });
-
-        canvas.addEventListener('touchend', () => {
-            isDragging = false;
-        });
-
-        canvas.addEventListener('touchcancel', () => {
-            isDragging = false;
-        });
-
-        // 状態フィードバック制御 u = -K·x（LQR）
-        function stateFeedback() {
-            return gains.kx       * state.x
-                 + gains.kxdot    * state.x_dot
-                 + gains.ktheta   * state.theta
-                 + gains.kthetadot* state.theta_dot;
-        }
-
-        // 物理シミュレーション
-        function simulate(force) {
-            const { M, m, L, g, friction } = params;
-            const { theta, theta_dot, x_dot } = state;
-
-            const sin_theta = Math.sin(theta);
-            const cos_theta = Math.cos(theta);
-
-            // 運動方程式
-            const denominator = M + m * sin_theta * sin_theta;
-
-            const theta_ddot = (g * sin_theta + cos_theta * (
-                (-force - m * L * theta_dot * theta_dot * sin_theta + friction * x_dot) / (M + m)
-            )) / (L * (4/3 - m * cos_theta * cos_theta / (M + m)));
-
-            const x_ddot = (force + m * L * (theta_dot * theta_dot * sin_theta - theta_ddot * cos_theta) - friction * x_dot) / (M + m);
-
-            // オイラー法で状態更新
-            state.theta_dot += theta_ddot * dt;
-            state.theta += state.theta_dot * dt;
-            state.x_dot += x_ddot * dt;
-            state.x += state.x_dot * dt;
-
-            // カート位置の制限
-            const maxX = 3.5;
-            if (Math.abs(state.x) > maxX) {
-                state.x = Math.sign(state.x) * maxX;
-                state.x_dot = 0;
-            }
-        }
-
-        // 描画
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            // スケールに応じたサイズ調整
-            const cartWidth = Math.max(40, scale * 0.8);
-            const cartHeight = Math.max(20, scale * 0.4);
-            const wheelRadius = Math.max(5, scale * 0.1);
-            const pendulumBallRadius = Math.max(8, scale * 0.15);
-
-            // レール
-            ctx.strokeStyle = '#ccc';
-            ctx.lineWidth = Math.max(2, scale * 0.04);
-            ctx.beginPath();
-            const railMargin = Math.max(20, canvas.width * 0.05);
-            ctx.moveTo(railMargin, centerY + cartHeight / 2 + wheelRadius);
-            ctx.lineTo(canvas.width - railMargin, centerY + cartHeight / 2 + wheelRadius);
-            ctx.stroke();
-
-            // カート位置
-            const cartX = centerX + state.x * scale;
-            const cartY = centerY;
-
-            // カート
-            ctx.fillStyle = '#3498db';
-            ctx.fillRect(cartX - cartWidth / 2, cartY - cartHeight / 2, cartWidth, cartHeight);
-            ctx.strokeStyle = '#2980b9';
-            ctx.lineWidth = Math.max(2, scale * 0.03);
-            ctx.strokeRect(cartX - cartWidth / 2, cartY - cartHeight / 2, cartWidth, cartHeight);
-
-            // 車輪
-            ctx.fillStyle = '#34495e';
-            const wheelOffset = cartWidth / 3;
-            ctx.beginPath();
-            ctx.arc(cartX - wheelOffset, cartY + cartHeight / 2 + wheelRadius, wheelRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(cartX + wheelOffset, cartY + cartHeight / 2 + wheelRadius, wheelRadius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 振子
-            const pendulumX = cartX + Math.sin(state.theta) * params.L * scale;
-            const pendulumY = cartY - Math.cos(state.theta) * params.L * scale;
-
-            // 振子の棒
-            ctx.strokeStyle = '#e74c3c';
-            ctx.lineWidth = Math.max(3, scale * 0.06);
-            ctx.beginPath();
-            ctx.moveTo(cartX, cartY);
-            ctx.lineTo(pendulumX, pendulumY);
-            ctx.stroke();
-
-            // 振子の重り
-            ctx.fillStyle = '#e74c3c';
-            ctx.beginPath();
-            ctx.arc(pendulumX, pendulumY, pendulumBallRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#c0392b';
-            ctx.lineWidth = Math.max(2, scale * 0.03);
-            ctx.stroke();
-
-            // 支点
-            ctx.fillStyle = '#2c3e50';
-            ctx.beginPath();
-            ctx.arc(cartX, cartY, Math.max(4, scale * 0.08), 0, Math.PI * 2);
-            ctx.fill();
-
-            // 目標角度の表示（垂直線）
-            ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
-            ctx.lineWidth = Math.max(1, scale * 0.02);
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(cartX, cartY);
-            ctx.lineTo(cartX, cartY - params.L * scale);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // 統計情報の更新
-        function updateStats(controlForce) {
-            document.getElementById('angle').textContent = (state.theta * 180 / Math.PI).toFixed(1) + '°';
-            document.getElementById('angular-velocity').textContent = state.theta_dot.toFixed(2) + ' rad/s';
-            document.getElementById('control-input').textContent = controlForce.toFixed(2) + ' N';
-            document.getElementById('cart-position').textContent = state.x.toFixed(2) + ' m';
-        }
-
-        // メインループ
-        function loop() {
-            if (!isDragging) {
-                const controlForce = stateFeedback();
-
-                // 物理シミュレーション
-                simulate(controlForce);
-
-                // 統計情報更新
-                updateStats(controlForce);
+                // カート位置の制限
+                const maxX = 3.5;
+                if (Math.abs(state.x) > maxX) {
+                    state.x = Math.sign(state.x) * maxX;
+                    state.x_dot = 0;
+                }
             }
 
             // 描画
-            draw();
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            requestAnimationFrame(loop);
-        }
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
 
-        loop();
-    </script>
-</body>
+                // スケールに応じたサイズ調整
+                const cartWidth = Math.max(40, scale * 0.8);
+                const cartHeight = Math.max(20, scale * 0.4);
+                const wheelRadius = Math.max(5, scale * 0.1);
+                const pendulumBallRadius = Math.max(8, scale * 0.15);
+
+                // レール
+                ctx.strokeStyle = "#ccc";
+                ctx.lineWidth = Math.max(2, scale * 0.04);
+                ctx.beginPath();
+                const railMargin = Math.max(20, canvas.width * 0.05);
+                ctx.moveTo(railMargin, centerY + cartHeight / 2 + wheelRadius);
+                ctx.lineTo(
+                    canvas.width - railMargin,
+                    centerY + cartHeight / 2 + wheelRadius,
+                );
+                ctx.stroke();
+
+                // カート位置
+                const cartX = centerX + state.x * scale;
+                const cartY = centerY;
+
+                // カート
+                ctx.fillStyle = "#3498db";
+                ctx.fillRect(
+                    cartX - cartWidth / 2,
+                    cartY - cartHeight / 2,
+                    cartWidth,
+                    cartHeight,
+                );
+                ctx.strokeStyle = "#2980b9";
+                ctx.lineWidth = Math.max(2, scale * 0.03);
+                ctx.strokeRect(
+                    cartX - cartWidth / 2,
+                    cartY - cartHeight / 2,
+                    cartWidth,
+                    cartHeight,
+                );
+
+                // 車輪
+                ctx.fillStyle = "#34495e";
+                const wheelOffset = cartWidth / 3;
+                ctx.beginPath();
+                ctx.arc(
+                    cartX - wheelOffset,
+                    cartY + cartHeight / 2 + wheelRadius,
+                    wheelRadius,
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(
+                    cartX + wheelOffset,
+                    cartY + cartHeight / 2 + wheelRadius,
+                    wheelRadius,
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.fill();
+
+                // 振子
+                const pendulumX =
+                    cartX + Math.sin(state.theta) * params.L * scale;
+                const pendulumY =
+                    cartY - Math.cos(state.theta) * params.L * scale;
+
+                // 振子の棒
+                ctx.strokeStyle = "#e74c3c";
+                ctx.lineWidth = Math.max(3, scale * 0.06);
+                ctx.beginPath();
+                ctx.moveTo(cartX, cartY);
+                ctx.lineTo(pendulumX, pendulumY);
+                ctx.stroke();
+
+                // 振子の重り
+                ctx.fillStyle = "#e74c3c";
+                ctx.beginPath();
+                ctx.arc(
+                    pendulumX,
+                    pendulumY,
+                    pendulumBallRadius,
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.fill();
+                ctx.strokeStyle = "#c0392b";
+                ctx.lineWidth = Math.max(2, scale * 0.03);
+                ctx.stroke();
+
+                // 支点
+                ctx.fillStyle = "#2c3e50";
+                ctx.beginPath();
+                ctx.arc(
+                    cartX,
+                    cartY,
+                    Math.max(4, scale * 0.08),
+                    0,
+                    Math.PI * 2,
+                );
+                ctx.fill();
+
+                // 目標角度の表示（垂直線）
+                ctx.strokeStyle = "rgba(46, 204, 113, 0.3)";
+                ctx.lineWidth = Math.max(1, scale * 0.02);
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(cartX, cartY);
+                ctx.lineTo(cartX, cartY - params.L * scale);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 統計情報の更新
+            function updateStats(controlForce) {
+                document.getElementById("angle").textContent =
+                    ((state.theta * 180) / Math.PI).toFixed(1) + "°";
+                document.getElementById("angular-velocity").textContent =
+                    state.theta_dot.toFixed(2) + " rad/s";
+                document.getElementById("control-input").textContent =
+                    controlForce.toFixed(2) + " N";
+                document.getElementById("cart-position").textContent =
+                    state.x.toFixed(2) + " m";
+            }
+
+            // メインループ
+            function loop() {
+                if (!isDragging) {
+                    const controlForce = stateFeedback();
+
+                    // 物理シミュレーション
+                    simulate(controlForce);
+
+                    // 統計情報更新
+                    updateStats(controlForce);
+                }
+
+                // 描画
+                draw();
+
+                requestAnimationFrame(loop);
+            }
+
+            loop();
+        </script>
+    </body>
 </html>
